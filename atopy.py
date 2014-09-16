@@ -7,8 +7,37 @@ import datetime
 
 MYMAGIC = 0xfeedbeef
 
-
 class ProcessStat(object):
+    tgid=None
+    pid=None
+    ppid=None
+    ruid=None
+    euid=None
+    suid=None
+    fsuid=None
+    rgid=None
+    egid=None
+    sgid=None
+    fsgid=None
+    nthr=None
+    name=None
+    isproc=None
+    state=None
+    excode=None
+    btime=None
+    elaps=None
+    cmdline=None
+    nthrslpi=None
+    nthrslpu=None
+    nthrrun=None
+    envid=None
+    ifuture1=None
+    ifuture2=None
+    ifuture3=None
+    ifuture4=None
+
+
+class ProcessStats(object):
 
     def __init__(self, pstat, tstatlen, f_tstat):
         self.pstat = pstat
@@ -18,14 +47,15 @@ class ProcessStat(object):
     def __iter__(self):
         for a in range(0, len(self.pstat), self.tstatlen):
             s = self.pstat[a: a+self.tstatlen]
-            tgid, pid, ppid, ruid, euid, suid, fsuid, rgid, egid, sgid, \
-                fsgid, nthr, name, isproc, state, excode, btime, elaps, \
-                cmdline, nthrslpi, nthrslpu, nthrrun, envid, ifuture1, \
-                ifuture2, ifuture3, ifuture4 \
+            r = ProcessStat()
+            r.tgid, r.pid, r.ppid, r.ruid, r.euid, r.suid, r.fsuid, r.rgid, r.egid, r.sgid, \
+                r.fsgid, r.nthr, r.name, r.isproc, r.state, r.excode, r.btime, r.elaps, \
+                r.cmdline, r.nthrslpi, r.nthrslpu, r.nthrrun, r.envid, r.ifuture1, \
+                r.ifuture2, r.ifuture3, r.ifuture4 \
                 = struct.unpack(self.f_tstat, s[:struct.calcsize(self.f_tstat)])
-            name = name.strip('\x00')
-            cmdline = cmdline.strip('\x00')
-            yield name, cmdline
+            r.name = r.name.strip('\x00')
+            r.cmdline = r.cmdline.strip('\x00')
+            yield r
 
 
 class Stat(object):
@@ -41,7 +71,7 @@ class Stat(object):
         if key == 'system':
             return zlib.decompress(self.scomp)
         if key == 'process':
-            return ProcessStat(zlib.decompress(self.pcomp), self.tstatlen,
+            return ProcessStats(zlib.decompress(self.pcomp), self.tstatlen,
                                self.f_tstat)
 
         raise AttributeError('%s is missing' % key)
@@ -66,7 +96,6 @@ class Atop(object):
         pagesize, supportedflags, osrel, osvers, ossub, ifuture1, ifuture2,\
             ifuture3, ifuture4, ifuture5, ifuture6 = \
             struct.unpack(f_endheader, f.read(struct.calcsize(f_endheader)))
-        print osrel, osvers, ossub
         self.f.seek(rawheadlen)
 
         self.f_rawrecord = '<l' + 4 * 'H' + 19 * 'I'
@@ -84,15 +113,10 @@ class Atop(object):
             machin = struct.unpack(self.f_rawrecord, rawrecord)
             #ugly patch
             self.f.read(8)
-            print machin
             curtime = machin[0]
             dt = datetime.datetime.fromtimestamp(curtime)
-            now = int(time.time())
-            print "age", (now - curtime) / (3600 * 24)
             scomplen = machin[6]
             pcomplen = machin[7]
-            print scomplen
-            print pcomplen
             ndeviat = machin[9]
             nactproc = machin[10]
 
@@ -113,4 +137,4 @@ if __name__ == "__main__":
     a = Atop(open(sys.argv[1], 'r'))
     for stat in a:
         for s in stat.process:
-            print stat.curtime, s
+            print "%s [%s] %s" % (stat.curtime, s.name, s.cmdline)
